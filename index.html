@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>4키 하이퍼 리듬게임</title>
+    <style>
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body {
+            margin: 0;
+            background: #09090f;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: 100%;
+            max-height: 100vh;
+            background: #11111b;
+            border-left: 1px solid #22223b;
+            border-right: 1px solid #22223b;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header-ui {
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: bold;
+            border-bottom: 2px solid #22223b;
+            z-index: 5;
+        }
+        #ui-song-name { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ff0055; }
+        #ui-score { color: #00ffcc; }
+        #ui-combo { color: #ffaa00; }
+        
+        #track-container {
+            position: relative;
+            flex: 1;
+            display: flex;
+            background: #0d0d15;
+        }
+        .lane {
+            flex: 1;
+            border-right: 1px solid rgba(255,255,255,0.03);
+            position: relative;
+            height: 100%;
+        }
+        .lane:last-child { border-right: none; }
+        
+        .note {
+            position: absolute;
+            width: 100%;
+            height: 22px;
+            background: linear-gradient(180deg, #00ffff, #0066ff);
+            border-radius: 4px;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        #judgement-line {
+            position: absolute;
+            bottom: 110px;
+            width: 100%;
+            height: 4px;
+            background: #ff0055;
+            box-shadow: 0 0 12px #ff0055;
+            z-index: 3;
+        }
+
+        #feedback {
+            position: absolute;
+            bottom: 160px;
+            width: 100%;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 900;
+            z-index: 4;
+            pointer-events: none;
+            transition: transform 0.05s;
+        }
+
+        .touch-pad {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 110px;
+            display: flex;
+            z-index: 5;
+            background: rgba(0,0,0,0.4);
+            border-top: 1px solid #22223b;
+        }
+        .touch-key {
+            flex: 1;
+            border-right: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #777799;
+            background: rgba(255,255,255,0.01);
+        }
+        .touch-key.active {
+            background: rgba(0, 255, 255, 0.2);
+            color: #00ffcc;
+            box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+
+        /* 메뉴 및 결과 화면 */
+        #menu, #result-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(9, 9, 15, 0.97);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            padding: 15px;
+            text-align: center;
+        }
+        h2 { margin: 0 0 10px 0; color: #00ffcc; font-size: 20px; }
+        .song-btn {
+            width: 100%;
+            max-width: 320px;
+            padding: 10px 12px;
+            margin: 4px 0;
+            font-size: 12px;
+            font-weight: bold;
+            background: #1a1a2e;
+            color: white;
+            border: 1px solid #2a2a4e;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .song-btn:active { background: #ff0055; }
+        
+        #result-screen { display: none; }
+        .primary-btn {
+            padding: 10px 25px;
+            margin-top: 15px;
+            font-size: 15px;
+            font-weight: bold;
+            background: #ff0055;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #ff0055;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <!-- 곡 선택 메뉴 -->
+        <div id="menu">
+            <h2>HYPER RHYTHM</h2>
+            <p style="font-size: 11px; color: #888; margin-bottom: 10px;">컴퓨터: A, S, D, F | 모바일: 하단 터치</p>
+            <div id="song-list" style="width: 100%; max-width: 320px; max-height: 65vh; overflow-y: auto;"></div>
+        </div>
+
+        <!-- 결과 화면 -->
+        <div id="result-screen">
+            <h2>STAGE CLEAR!</h2>
+            <p id="res-song-title" style="color: #ffaa00; font-weight: bold; font-size: 14px;"></p>
+            <p id="res-score" style="font-size: 18px; color: #00ffcc; margin: 5px 0;"></p>
+            <p id="res-max-combo" style="font-size: 14px; color: #aaa;"></p>
+            <button class="primary-btn" onclick="returnToMenu()">메뉴로 돌아가기</button>
+        </div>
+
+        <!-- 상단 헤더 -->
+        <div class="header-ui">
+            <div id="ui-song-name">곡 제목</div>
+            <div><span id="ui-score">0</span> | <span id="ui-combo">0 COMBO</span></div>
+        </div>
+
+        <!-- 게임 레인 -->
+        <div id="track-container">
+            <div class="lane" data-lane="0"></div>
+            <div class="lane" data-lane="1"></div>
+            <div class="lane" data-lane="2"></div>
+            <div class="lane" data-lane="3"></div>
+            <div id="judgement-line"></div>
+            <div id="feedback">READY</div>
+        </div>
+
+        <!-- 터치패드 -->
+        <div class="touch-pad">
+            <div class="touch-key" data-lane="0">A</div>
+            <div class="touch-key" data-lane="1">S</div>
+            <div class="touch-key" data-lane="2">D</div>
+            <div class="touch-key" data-lane="3">F</div>
+        </div>
+    </div>
+
+<script>
+    const keys = ['KeyA', 'KeyS', 'KeyD', 'KeyF'];
+    
+    const songs = [
+        { id: 1, title: "Lv.1 베기너 스타트", bpm: 90, speed: 3.2, density: 55 },
+        { id: 2, title: "Lv.2 이지 비트", bpm: 100, speed: 3.7, density: 48 },
+        { id: 3, title: "Lv.3 네온 스트리트", bpm: 110, speed: 4.2, density: 42 },
+        { id: 4, title: "Lv.4 일렉트릭 웨이브", bpm: 120, speed: 4.7, density: 36 },
+        { id: 5, title: "Lv.5 하이퍼 오버드라이브", bpm: 135, speed: 5.2, density: 30 },
+        { id: 6, title: "Lv.6 신사이드 런너", bpm: 150, speed: 5.7, density: 25 },
+        { id: 7, title: "Lv.7 터보 차저", bpm: 165, speed: 6.2, density: 20 },
+        { id: 8, title: "Lv.8 사이버 헬", bpm: 180, speed: 6.8, density: 16 },
+        { id: 9, title: "Lv.9 오버클럭 존", bpm: 200, speed: 7.3, density: 13 },
+        { id: 10, title: "Lv.10 월드 보스 [UNKNOWN]", bpm: 220, speed: 8.0, density: 10 }
+    ];
+
+    let currentSong = null;
+    let score = 0;
+    let combo = 0;
+    let maxCombo = 0;
+    let gameActive = false;
+    let notes = [];
+    let frameCount = 0;
+    let audioCtx = null;
+
+    const lanes = document.querySelectorAll('.lane');
+    const touchKeys = document.querySelectorAll('.touch-key');
+    const scoreDisplay = document.getElementById('ui-score');
+    const comboDisplay = document.getElementById('ui-combo');
+    const feedback = document.getElementById('feedback');
+    const menu = document.getElementById('menu');
+    const resultScreen = document.getElementById('result-screen');
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    function playSound(freq, type = 'sine', duration = 0.06) {
+        if (!audioCtx) return;
+        try {
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        } catch(e) {}
+    }
+
+    function buildSongMenu() {
+        let container = document.getElementById('song-list');
+        container.innerHTML = '';
+        songs.forEach(song => {
+            let btn = document.createElement('button');
+            btn.className = 'song-btn';
+            btn.innerHTML = `<span>${song.title}</span> <span style="color:#ff0055">BPM ${song.bpm}</span>`;
+            btn.onclick = () => startSong(song);
+            container.appendChild(btn);
+        });
+    }
+    buildSongMenu();
+
+    function startSong(song) {
+        initAudio();
+        currentSong = song;
+        score = 0;
+        combo = 0;
+        maxCombo = 0;
+        notes = [];
+        frameCount = 0;
+        gameActive = true;
+
+        menu.style.display = 'none';
+        resultScreen.style.display = 'none';
+        document.getElementById('ui-song-name').innerText = song.title;
+        scoreDisplay.innerText = "0";
+        comboDisplay.innerText = "0 COMBO";
+        feedback.innerText = "START!";
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function spawnNote() {
+        if (!gameActive) return;
+        let laneIdx = Math.floor(Math.random() * 4);
+        let noteEl = document.createElement('div');
+        noteEl.classList.add('note');
+        noteEl.style.top = '-25px';
+        lanes[laneIdx].appendChild(noteEl);
+
+        notes.push({
+            element: noteEl,
+            lane: laneIdx,
+            y: -25,
+            hit: false
+        });
+
+        if (frameCount % 12 === 0) {
+            let notesFreq = [261.63, 329.63, 392.00, 523.25];
+            playSound(notesFreq[Math.floor(Math.random() * notesFreq.length)], 'triangle', 0.08);
+        }
+    }
+
+    function triggerEffect(laneIdx) {
+        let keyEl = touchKeys[laneIdx];
+        keyEl.classList.add('active');
+        setTimeout(() => keyEl.classList.remove('active'), 60);
+    }
+
+    function handleInput(laneIdx) {
+        if (!gameActive) return;
+        triggerEffect(laneIdx);
+        playSound(550 + laneIdx * 90, 'square', 0.04);
+
+        const targetY = lanes[0].clientHeight - 110; 
+        let hitProcessed = false;
+
+        for (let note of notes) {
+            if (note.lane === laneIdx && !note.hit) {
+                let diff = Math.abs(note.y - targetY);
+                if (diff < 60) { // 판정 완화 (씹힘 방지)
+                    note.hit = true;
+                    note.element.remove();
+                    hitProcessed = true;
+
+                    if (diff < 22) {
+                        showFeedback("PERFECT!", "#00ffcc");
+                        score += 300 * currentSong.id;
+                    } else if (diff < 40) {
+                        showFeedback("GREAT!", "#00ccff");
+                        score += 200 * currentSong.id;
+                    } else {
+                        showFeedback("GOOD", "#ffff00");
+                        score += 100 * currentSong.id;
+                    }
+                    combo++;
+                    if (combo > maxCombo) maxCombo = combo;
+                    break;
+                }
+            }
+        }
+
+        scoreDisplay.innerText = score;
+        comboDisplay.innerText = combo > 1 ? `${combo} COMBO` : "";
+    }
+
+    function showFeedback(text, color) {
+        feedback.innerText = text;
+        feedback.style.color = color;
+        feedback.style.transform = "scale(1.15)";
+        setTimeout(() => feedback.style.transform = "scale(1)", 40);
+    }
+
+    // 키보드 입력 최적화 (중복 입력 및 브라우저 기본 동작 완벽 차단)
+    const activeKeys = {};
+    window.addEventListener('keydown', (e) => {
+        let idx = keys.indexOf(e.code);
+        if (idx !== -1) {
+            e.preventDefault();
+            if (!activeKeys[e.code]) {
+                activeKeys[e.code] = true;
+                handleInput(idx);
+            }
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        let idx = keys.indexOf(e.code);
+        if (idx !== -1) {
+            activeKeys[e.code] = false;
+        }
+    });
+
+    // 모바일 터치 이벤트 최적화 (지연 시간 제거)
+    touchKeys.forEach((tkey) => {
+        let idx = parseInt(tkey.getAttribute('data-lane'));
+        tkey.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleInput(idx);
+        }, { passive: false });
+    });
+
+    function gameLoop() {
+        if (!gameActive) return;
+
+        frameCount++;
+        if (frameCount % currentSong.density === 0) {
+            spawnNote();
+        }
+
+        let containerHeight = lanes[0].clientHeight;
+
+        for (let i = notes.length - 1; i >= 0; i--) {
+            let note = notes[i];
+            if (!note.hit) {
+                note.y += currentSong.speed;
+                note.element.style.top = `${note.y}px`;
+
+                if (note.y > containerHeight - 80) {
+                    note.hit = true;
+                    note.element.remove();
+                    notes.splice(i, 1);
+                    combo = 0;
+                    comboDisplay.innerText = "";
+                    showFeedback("MISS", "#ff0055");
+                    playSound(130, 'sawtooth', 0.08);
+                }
+            } else {
+                notes.splice(i, 1);
+            }
+        }
+
+        if (frameCount > 2200) {
+            endGame();
+            return;
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function endGame() {
+        gameActive = false;
+        document.querySelectorAll('.note').forEach(n => n.remove());
+        document.getElementById('res-song-title').innerText = currentSong.title;
+        document.getElementById('res-score').innerText = `최종 점수: ${score}`;
+        document.getElementById('res-max-combo').innerText = `최대 콤보: ${maxCombo}`;
+        resultScreen.style.display = 'flex';
+    }
+
+    function returnToMenu() {
+        resultScreen.style.display = 'none';
+        menu.style.display = 'flex';
+    }
+</script>
+
+</body>
+</html>
