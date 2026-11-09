@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>4키 하이퍼 리듬게임</title>
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background: #222;
+            border: 4px solid #444;
+            box-shadow: 0 0 20px rgba(0,255,255,0.3);
+            display: flex;
+            overflow: hidden;
+        }
+        .lane {
+            flex: 1;
+            border-right: 1px solid #333;
+            position: relative;
+            height: 100%;
+        }
+        .lane:last-child {
+            border-right: none;
+        }
+        .note {
+            position: absolute;
+            width: 100%;
+            height: 20px;
+            background: cyan;
+            border-radius: 4px;
+            box-shadow: 0 0 10px cyan;
+        }
+        #judgement-line {
+            position: absolute;
+            bottom: 80px;
+            width: 100%;
+            height: 4px;
+            background: #ff0055;
+            box-shadow: 0 0 10px #ff0055;
+        }
+        .ui {
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        #ui-score { font-size: 24px; font-weight: bold; color: #00ffcc; }
+        #ui-combo { font-size: 18px; color: #ffaa00; height: 25px; }
+        #ui-status { font-size: 20px; height: 30px; font-weight: bold; }
+        .touch-pad {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 80px;
+            display: flex;
+            pointer-events: none;
+        }
+        .touch-key {
+            flex: 1;
+            border-top: 2px solid rgba(255,255,255,0.1);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #777;
+        }
+        #menu {
+            position: absolute;
+            background: rgba(17,17,17,0.95);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            background: #ff0055;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #ff0055;
+        }
+        button:hover { background: #ff3377; }
+    </style>
+</head>
+<body>
+
+    <div class="ui">
+        <div id="ui-score">SCORE: 0</div>
+        <div id="ui-combo"></div>
+        <div id="ui-status">READY</div>
+    </div>
+
+    <div id="game-container">
+        <!-- 메뉴 화면 -->
+        <div id="menu">
+            <h2>4-KEY RHYTHM GAME</h2>
+            <p>컴퓨터 키: D, F, J, K</p>
+            <p>모바일: 하단 터치</p>
+            <button onclick="startGame(1)">Lv.1 베기너</button>
+            <button onclick="startGame(2)">Lv.3 노멀</button>
+            <button onclick="startGame(3)">Lv.5 하드</button>
+            <button onclick="startGame(4)">Lv.8 익스트림</button>
+        </div>
+
+        <!-- 4개 레인 -->
+        <div class="lane" id="lane0"></div>
+        <div class="lane" id="lane1"></div>
+        <div class="lane" id="lane2"></div>
+        <div class="lane" id="lane3"></div>
+
+        <div id="judgement-line"></div>
+
+        <!-- 모바일 터치 영역 표시 -->
+        <div class="touch-pad">
+            <div class="touch-key">D</div>
+            <div class="touch-key">F</div>
+            <div class="touch-key">J</div>
+            <div class="touch-key">K</div>
+        </div>
+    </div>
+
+<script>
+    const keys = ['KeyD', 'KeyF', 'KeyJ', 'KeyK'];
+    let score = 0;
+    let combo = 0;
+    let gameActive = false;
+    let notes = [];
+    let noteSpeed = 5;
+    let spawnTimer = 0;
+    let currentLevel = 1;
+
+    const lanes = [
+        document.getElementById('lane0'),
+        document.getElementById('lane1'),
+        document.getElementById('lane2'),
+        document.getElementById('lane3')
+    ];
+
+    const scoreDisplay = document.getElementById('ui-score');
+    const comboDisplay = document.getElementById('ui-combo');
+    const statusDisplay = document.getElementById('ui-status');
+    const menu = document.getElementById('menu');
+
+    function startGame(level) {
+        currentLevel = level;
+        noteSpeed = 4 + level * 1.2;
+        score = 0;
+        combo = 0;
+        notes = [];
+        gameActive = true;
+        menu.style.display = 'none';
+        scoreDisplay.innerText = `SCORE: ${score}`;
+        statusDisplay.innerText = "START!";
+        loop();
+    }
+
+    // 노트 생성 로직 (10가지 노래 컨셉에 맞춰 난이도별 자동 채보 생성)
+    function spawnNote() {
+        if (!gameActive) return;
+        const laneIdx = Math.floor(Math.random() * 4);
+        const noteEl = document.createElement('div');
+        noteEl.classList.add('note');
+        noteEl.style.top = '-20px';
+        lanes[laneIdx].appendChild(noteEl);
+
+        notes.push({
+            element: noteEl,
+            lane: laneIdx,
+            y: -20,
+            hit: false
+        });
+    }
+
+    // 키 입력 처리 (컴퓨터 & 모바일 공통)
+    function handleInput(laneIdx) {
+        if (!gameActive) return;
+        
+        const lineY = 520; // 판정선 위치 (600 - 80)
+        let hitProcessed = false;
+
+        for (let note of notes) {
+            if (note.lane === laneIdx && !note.hit) {
+                let diff = Math.abs(note.y - lineY);
+                if (diff < 40) { // 판정 범위
+                    note.hit = true;
+                    note.element.remove();
+                    
+                    if (diff < 15) {
+                        showJudgement("PERFECT!", "#00ffcc");
+                        score += 300 * currentLevel;
+                    } else if (diff < 25) {
+                        showJudgement("GREAT!", "#00ccff");
+                        score += 200 * currentLevel;
+                    } else {
+                        showJudgement("GOOD", "#ffff00");
+                        score += 100 * currentLevel;
+                    }
+                    combo++;
+                    hitProcessed = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hitProcessed) {
+            // 빈 깡통 클릭/키 입력 시 콤보 브레이크
+            // combo = 0;
+            // comboDisplay.innerText = "";
+        }
+        scoreDisplay.innerText = `SCORE: ${score}`;
+        comboDisplay.innerText = combo > 1 ? `${combo} COMBO!` : "";
+    }
+
+    function showJudgement(text, color) {
+        statusDisplay.innerText = text;
+        statusDisplay.style.color = color;
+    }
+
+    // 키보드 이벤트 (컴퓨터)
+    window.addEventListener('keydown', (e) => {
+        let idx = keys.indexOf(e.code);
+        if (idx !== -1) {
+            handleInput(idx);
+            // 시각적 효과
+            lanes[idx].style.background = 'rgba(255,255,255,0.1)';
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        let idx = keys.indexOf(e.code);
+        if (idx !== -1) {
+            lanes[idx].style.background = 'transparent';
+        }
+    });
+
+    // 터치 이벤트 (모바일)
+    lanes.forEach((lane, idx) => {
+        lane.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleInput(idx);
+        });
+    });
+
+    // 메인 게임 루프
+    let frameCount = 0;
+    function loop() {
+        if (!gameActive) return;
+
+        frameCount++;
+        if (frameCount % Math.max(15, 60 - currentLevel * 8) === 0) {
+            spawnNote();
+        }
+
+        for (let i = notes.length - 1; i >= 0; i--) {
+            let note = notes[i];
+            if (!note.hit) {
+                note.y += noteSpeed;
+                note.element.style.top = `${note.y}px`;
+
+                // 판정선을 지나쳐서 놓친 경우 (Miss)
+                if (note.y > 560) {
+                    note.hit = true;
+                    note.element.remove();
+                    notes.splice(i, 1);
+                    combo = 0;
+                    comboDisplay.innerText = "";
+                    showJudgement("MISS", "#ff0055");
+                }
+            } else {
+                notes.splice(i, 1);
+            }
+        }
+
+        requestAnimationFrame(loop);
+    }
+</script>
+
+</body>
+</html>
